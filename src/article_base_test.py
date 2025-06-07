@@ -12,7 +12,7 @@ if __name__ == "__main__":
         Cumulate,
         BinaryDataLoader(article_data["file_path"]),
         2,
-        0.66,
+        0.60,
     )
 
     runner.mine_frequent_itemsets(log=True)

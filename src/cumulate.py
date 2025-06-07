@@ -1,6 +1,8 @@
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Union
 from itertools import combinations, chain
 from collections import defaultdict
+
+Nested = Dict[str, Union[Set[str], "Nested"]]
 
 
 class TrieNode:
@@ -207,3 +209,33 @@ class Cumulate:
 
 def _powerset(s):
     return chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1))
+
+
+def compute_ancestors_from_tree(tree) -> Dict[str, Set[str]]:
+    """
+    Given a nested‐dict taxonomy:
+      {
+        "clothes": {
+          "outerwear": {"jacket", "ski_pants"},
+          "shirt": {}
+        },
+        "footwear": {"shoes", "hiking_boots"}
+      }
+    Returns T_star: each item → set of *all* its ancestors.
+    """
+    T_star: Dict[str, Set[str]] = {}
+
+    def visit(node: str, subtree: Union[Set[str], Nested], ancestors: Set[str]):
+        T_star.setdefault(node, set()).update(ancestors)
+
+        if isinstance(subtree, dict):
+            for child, child_sub in subtree.items():
+                visit(child, child_sub, ancestors | {node})
+        else:
+            for child in subtree:
+                visit(child, {}, ancestors | {node})
+
+    for root, sub in tree.items():
+        visit(root, sub, set())
+
+    return T_star

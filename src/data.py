@@ -46,6 +46,15 @@ data = {
             "hiking_boots": {"footwear"},
             "shoes": {"footwear"},
         },
+        "taxonomy_two": {
+            "clothes": {
+                "outerwear": {
+                    "jacket",
+                    "ski_pants",
+                },
+                "shirt": {},
+            },
+            "footwear": {"shoes", "hiking_boots"},
+        },
     },
 }
-
