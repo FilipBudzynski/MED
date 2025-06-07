@@ -34,7 +34,8 @@ if __name__ == "__main__":
     print("Frequent Itemsets:")
     for level in frequent_itemsets:
         for itemset in level:
-            print(set(itemset))
+            support = cumulate.support_counts.get(itemset, 0)
+            print(f"{set(itemset)} (support: {support})")
 
     print("\nGenerated Rules:")
     for rule in cumulate.rules:

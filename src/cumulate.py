@@ -21,14 +21,12 @@ class Cumulate:
         self.T_star = {}
         self._precompute_ancestors()
         self.frequent_itemsets = []
+        self.support_counts = {}
         self.rules = []
 
     def _precompute_ancestors(self):  # optymalizacja 2
         for item in self._all_items():
             self.T_star[item] = self._get_ancestors(item)
-
-        for item, ancestors in self.T_star.items():
-            print(f"{item} -> {ancestors}")
 
     def _all_items(self) -> Set[str]:
         items = set(self.taxonomy.keys())
@@ -44,15 +42,61 @@ class Cumulate:
             if current not in visited:
                 visited.add(current)
                 stack.extend(self.taxonomy.get(current, []))
-        visited.add(item)
         return visited
+
+    def generate_candidates(
+        self, prev_frequent_itemsets: List[frozenset], k: int
+    ) -> Set[frozenset]:
+        candidates = set()
+        L_prev = list(prev_frequent_itemsets)
+        for i in range(len(L_prev)):
+            for j in range(i + 1, len(L_prev)):
+                l1 = sorted(L_prev[i])
+                l2 = sorted(L_prev[j])
+                if l1[:-1] == l2[:-1]:
+                    union = frozenset(set(l1) | set(l2))
+                    if len(union) == k:
+                        all_subsets_frequent = all(
+                            frozenset(subset) in prev_frequent_itemsets
+                            for subset in combinations(union, k - 1)
+                        )
+                        if all_subsets_frequent:
+                            candidates.add(union)
+        return candidates
+
+    def _filter_candidates_with_ancestors(
+        self, candidates: Set[frozenset]
+    ) -> Set[frozenset]:
+        fitlered = set()
+        for cand in candidates:
+            contains_ancestors = False
+            for item in cand:
+                ancestors = self.T_star.get(item, set())
+                if ancestors & cand:
+                    contains_ancestors = True
+                    break
+            if not contains_ancestors:
+                fitlered.add(cand)
+        return fitlered
+
+    def _prune_T_star(self, Ck: Set[frozenset]):
+        candidate_items = set()
+        for c in Ck:
+            candidate_items.update(c)
+
+        new_T_star = {}
+        for item, ancestors in self.T_star.items():
+            pruned_ancestors = {a for a in ancestors if a in candidate_items}
+            new_T_star[item] = pruned_ancestors
+        return new_T_star
 
     def run(self) -> List[Set[frozenset]]:
         item_counts = defaultdict(int)
         for t in self.transactions:
             extended_t = set()
             for item in t:
-                extended_t.update(self.T_star.get(item, {item}))
+                extended_t.add(item)
+                extended_t.update(self.T_star.get(item, set()))
             for item in extended_t:
                 item_counts[frozenset([item])] += 1
 
@@ -60,47 +104,41 @@ class Cumulate:
         L1 = {item for item, count in item_counts.items() if count >= self.min_support}
         L.append(L1)
 
+        for item in L1:
+            self.support_counts[item] = item_counts[item]
+
         k = 2
         while True:
             prev_L = list(L[-1])
-            Ck = set()
-
-            for i in range(len(prev_L)):
-                for j in range(i + 1, len(prev_L)):
-                    union = prev_L[i] | prev_L[j]
-                    if len(union) == k:
-                        if self._contains_item_and_ancestor(union):
-                            continue
-                        Ck.add(union)
+            Ck = self.generate_candidates(prev_L, k)
 
             if not Ck:
                 break
 
-            # Optymalizacja: usuwamy przodków, którzy nie mają żadnych kandydatów
-            candidate_items = set()
-            for cand in Ck:
-                candidate_items.update(cand)
+            if k == 2:
+                Ck = self._filter_candidates_with_ancestors(Ck)
 
-            filtered_T_star = {
-                item: set(ancestors) & (candidate_items)
-                for item, ancestors in self.T_star.items()
-            }
+            # Optymalizacja: usuwamy przodków z T* którzy nie są obecni w C_k
+            self.T_star = self._prune_T_star(Ck)
 
             # Obliczamy wsparcie (support)
             counts = defaultdict(int)
             for t in self.transactions:
                 extended_t = set()
                 for item in t:
-                    ancestors = filtered_T_star.get(item, set())
-                    needed = ancestors & candidate_items
-                    if item in candidate_items:
-                        needed.add(item)
-                    extended_t.update(needed)
+                    ancestors = self.T_star.get(item, set())
+                    extended_t.add(item)
+                    extended_t.update(ancestors)
+
                 for cand in Ck:
                     if cand.issubset(extended_t):
                         counts[cand] += 1
 
             Lk = {cand for cand, count in counts.items() if count >= self.min_support}
+
+            for cand in Lk:
+                self.support_counts[cand] = counts[cand]
+
             if not Lk:
                 break
 
@@ -109,19 +147,6 @@ class Cumulate:
 
         self.frequent_itemsets = L
         return L
-
-    def _contains_item_and_ancestor(self, itemset: frozenset) -> bool:
-        for item in itemset:
-            ancestors = self.T_star.get(item, set())
-            if set(ancestors) & (itemset - {item}):
-                return True
-        return False
-        # items = list(itemset)
-        # for i in range(len(items)):
-        #     for j in range(len(items)):
-        #         if i != j and items[i] in self.T_star.get(items[j], set()):
-        #             return True
-        # return False
 
     def _filter_by_interest(self):
         filtered_rules = []
@@ -161,7 +186,8 @@ class Cumulate:
         for t in self.transactions:
             extended = set()
             for item in t:
-                extended.update(self.T_star.get(item, [item]))
+                extended.add(item)
+                extended.update(self.T_star.get(item, set()))
             extended_transactions.append(extended)
 
         # Count support for all frequent itemsets
