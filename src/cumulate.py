@@ -3,6 +3,22 @@ from itertools import combinations, chain
 from collections import defaultdict
 
 
+class TrieNode:
+    def __init__(self):
+        self.children = defaultdict(TrieNode)
+        self.is_end = False
+
+
+def build_trie(itemsets):
+    root = TrieNode()
+    for itemset in itemsets:
+        current = root
+        for item in sorted(itemset):
+            current = current.children[item]
+        current.is_end = True
+    return root
+
+
 class Cumulate:
     def __init__(
         self,
@@ -10,7 +26,7 @@ class Cumulate:
         taxonomy: Dict[str, Set[str]],
         min_support: int,
         min_confidence: float,
-        min_interest: float,
+        min_interest: float = 1.0,
     ):
         self.transactions = transactions
         self.taxonomy = taxonomy
@@ -44,24 +60,34 @@ class Cumulate:
                 stack.extend(self.taxonomy.get(current, []))
         return visited
 
-    def generate_candidates(
+    def _generate_candidates(
         self, prev_frequent_itemsets: List[frozenset], k: int
     ) -> Set[frozenset]:
         candidates = set()
-        L_prev = list(prev_frequent_itemsets)
-        for i in range(len(L_prev)):
-            for j in range(i + 1, len(L_prev)):
-                l1 = sorted(L_prev[i])
-                l2 = sorted(L_prev[j])
-                if l1[:-1] == l2[:-1]:
-                    union = frozenset(set(l1) | set(l2))
-                    if len(union) == k:
-                        all_subsets_frequent = all(
-                            frozenset(subset) in prev_frequent_itemsets
-                            for subset in combinations(union, k - 1)
+        prev_frequent_set = set(sorted(prev_frequent_itemsets))
+
+        trie_root = build_trie(prev_frequent_itemsets)
+
+        def traverse(node, prefix, depth):
+            if depth == k - 2:
+                children_items = sorted(node.children.keys())
+                for i in range(len(children_items)):
+                    for j in range(i + 1, len(children_items)):
+                        union = frozenset(
+                            prefix + [children_items[i], children_items[j]]
                         )
+                        all_subsets_frequent = True
+                        for subset in combinations(union, k - 1):
+                            if frozenset(subset) not in prev_frequent_set:
+                                all_subsets_frequent = False
+                                break
                         if all_subsets_frequent:
                             candidates.add(union)
+            else:
+                for item, child_node in node.children.items():
+                    traverse(child_node, prefix + [item], depth + 1)
+
+        traverse(trie_root, [], 0)
         return candidates
 
     def _filter_candidates_with_ancestors(
@@ -110,7 +136,7 @@ class Cumulate:
         k = 2
         while True:
             prev_L = list(L[-1])
-            Ck = self.generate_candidates(prev_L, k)
+            Ck = self._generate_candidates(prev_L, k)
 
             if not Ck:
                 break
@@ -177,51 +203,6 @@ class Cumulate:
                 filtered_rules.append(rule)
 
         self.rules = filtered_rules
-
-    def _generate_rules(self):
-        support_counts = defaultdict(int)
-
-        # Build extended transactions once
-        extended_transactions = []
-        for t in self.transactions:
-            extended = set()
-            for item in t:
-                extended.add(item)
-                extended.update(self.T_star.get(item, set()))
-            extended_transactions.append(extended)
-
-        # Count support for all frequent itemsets
-        for level in self.frequent_itemsets:
-            for itemset in level:
-                for t in extended_transactions:
-                    if itemset.issubset(t):
-                        support_counts[itemset] += 1
-
-        num_transactions = len(self.transactions)
-
-        for level in self.frequent_itemsets:
-            for itemset in level:
-                items = list(itemset)
-                for i in range(1, len(items)):
-                    for antecedent in combinations(items, i):
-                        antecedent = frozenset(antecedent)
-                        consequent = frozenset(itemset - antecedent)
-                        if not consequent:
-                            continue
-                        support_itemset = support_counts[itemset]
-                        support_antecedent = support_counts.get(antecedent, 0)
-                        if support_antecedent == 0:
-                            continue
-                        confidence = support_itemset / support_antecedent
-                        if confidence >= self.min_confidence:
-                            self.rules.append(
-                                {
-                                    "antecedent": antecedent,
-                                    "consequent": consequent,
-                                    "confidence": confidence,
-                                    "support": support_itemset / num_transactions,
-                                }
-                            )
 
 
 def _powerset(s):

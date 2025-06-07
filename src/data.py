@@ -1,0 +1,51 @@
+data = {
+    "market": {
+        "file_path": "data/market.csv",
+        "taxonomy": {
+            "Grains": {"Food"},
+            "Sweeteners": {"Food"},
+            "Seasonings": {"Food"},
+            "Dairy": {"Food"},
+            "Protein": {"Food"},
+            "Nuts": {"Food"},
+            "Produce": {"Food"},
+            # Food level 2
+            "Bread": {"Grains"},
+            "Flour": {"Grains"},
+            "Sugar": {"Sweeteners"},
+            "Honey": {"Sweeteners"},
+            "Salt": {"Seasonings"},
+            "Butter": {"Dairy"},
+            "HeavyCream": {"Dairy"},
+            "Milk": {"Dairy"},
+            "Cheese": {"Dairy"},
+            "Egg": {"Protein"},
+            "Meat": {"Protein"},
+            "Bacon": {"Protein"},
+            "Hazelnut": {"Nuts"},
+            "Vegetables": {"Produce"},
+            "Fruits": {"Produce"},
+            "Carrot": {"Vegetables"},
+            "Cucumber": {"Vegetables"},
+            "Onion": {"Vegetables"},
+            "Banana": {"Fruits"},
+            "Apple": {"Fruits"},
+            # Personal care
+            "Toothpaste": {"PersonalCare"},
+            "ShavingFoam": {"PersonalCare"},
+            "Shampoo": {"PersonalCare"},
+        },
+    },
+    "article": {
+        "file_path": "data/article_data.csv",
+        "taxonomy": {
+            "jacket": {"outerwear"},
+            "ski_pants": {"outerwear"},
+            "outerwear": {"clothes"},
+            "shirt": {"clothes"},
+            "hiking_boots": {"footwear"},
+            "shoes": {"footwear"},
+        },
+    },
+}
+
