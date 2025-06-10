@@ -4,21 +4,33 @@ from itertools import combinations
 
 
 class Runner:
+    """
+    Constructs new runner object to load transactions and initiate data mining algorithms
+
+    :param min_support: [0 - 1] float -- minimal support 
+    :param min_confidence: [0 - 1] float -- minimal confidence 
+    """
     def __init__(
         self,
         taxonomy,
         miner,
         data_loader: DataLoader,
-        min_support: int,
+        min_support: float,
         min_confidence: float,
     ):
         self.taxonomy = taxonomy
         self.data_loader = data_loader
-        self.miner = miner(self.load(), taxonomy, min_support, min_confidence)
+        self.transactions = self.load()
+        self.min_support = min_support * len(self.transactions)
+        self.miner = miner(
+            self.transactions,
+            taxonomy,
+            min_support * len(self.transactions),
+            min_confidence,
+        )
 
     def load(self):
         transactions = self.data_loader.load()
-        self.transactions = transactions
         return transactions
 
     def mine_frequent_itemsets(self, log: bool = False):
