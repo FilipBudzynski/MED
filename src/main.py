@@ -1,6 +1,6 @@
 from runner import Runner
 from data import data
-from cumulate import Cumulate
+from cumulate import Cumulate, compute_ancestors_from_tree
 from loaders.loader import BinaryDataLoader
 
 if __name__ == "__main__":

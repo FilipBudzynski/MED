@@ -49,12 +49,12 @@ data = {
         "taxonomy_two": {
             "clothes": {
                 "outerwear": {
-                    "jacket",
-                    "ski_pants",
+                    "jacket": {},
+                    "ski_pants": {},
                 },
                 "shirt": {},
             },
-            "footwear": {"shoes", "hiking_boots"},
+            "footwear": {"shoes": {}, "hiking_boots": {}},
         },
     },
 }

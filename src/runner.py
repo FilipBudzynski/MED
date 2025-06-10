@@ -1,26 +1,29 @@
 from loaders.loader import DataLoader
 from collections import defaultdict
 from itertools import combinations
+from typing import Optional
 
 
 class Runner:
     """
     Constructs new runner object to load transactions and initiate data mining algorithms
 
-    :param min_support: [0 - 1] float -- minimal support 
-    :param min_confidence: [0 - 1] float -- minimal confidence 
+    :param min_support: [0 - 1] float -- minimal support
+    :param min_confidence: [0 - 1] float -- minimal confidence
     """
+
     def __init__(
         self,
         taxonomy,
         miner,
-        data_loader: DataLoader,
+        data_loader: Optional[DataLoader],
+        transactions,
         min_support: float,
         min_confidence: float,
     ):
         self.taxonomy = taxonomy
         self.data_loader = data_loader
-        self.transactions = self.load()
+        self.transactions = transactions or self.load()
         self.min_support = min_support * len(self.transactions)
         self.miner = miner(
             self.transactions,

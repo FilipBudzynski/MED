@@ -4,14 +4,13 @@ from cumulate import Cumulate
 from loaders.loader import BinaryDataLoader
 
 if __name__ == "__main__":
-
     article_data = data["article"]
 
     runner = Runner(
         article_data["taxonomy"],
         Cumulate,
         BinaryDataLoader(article_data["file_path"]),
-        2,
+        0.33,
         0.60,
     )
 
