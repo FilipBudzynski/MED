@@ -41,3 +41,35 @@ class BinaryDataLoader(DataLoader):
                 transactions.append(transaction)
 
         return transactions
+
+
+class SimpleSeparatedDataLoader(DataLoader):
+    """
+    Loads transaction data where each line contains comma-separated integer items.
+    Example:
+
+    199,8,137,10,139
+    5,201,42,77
+
+    Example for text data:
+
+    Jacket, Shoes
+    Shirt
+    Shirt, Jacket, Shoes
+    ...
+
+    Each line is parsed into a set of integers.
+    """
+
+    def __init__(self, data_path, separator=","):
+        super().__init__(data_path)
+        self.separator = separator
+
+    def load(self) -> List[Set[int]]:
+        transactions = []
+        with open(self.data_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                transaction = [item for item in line.split(self.separator)]
+                transactions.append(transaction)
+        return transactions

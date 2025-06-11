@@ -57,4 +57,5 @@ data = {
             "footwear": {"shoes": {}, "hiking_boots": {}},
         },
     },
+    "retail": {"file_path": "data/retail.csv", "taxonomy": {}},
 }

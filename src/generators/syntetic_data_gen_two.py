@@ -5,37 +5,10 @@ from math import exp
 import json
 import csv
 
-
-# NUM_ITEMS = 100000
-# NUM_ROOTS = 250
-# NUM_LEVELS = 4
-# FANOUT = 5
-# DEPTH_RATIO = 1.0
-#
-# NUM_TRANSACTIONS = 1000000
-# AVG_TRANSACTION_SIZE = 10
-# AVG_ITEMSET_SIZE = 4
-# NUM_MAX_ITEMSETS = 10000
-# CORRELATION_LEVEL = 0.5
+np.random.seed(124)
+random.seed(124)
 
 
-NUM_ITEMS = 100
-NUM_ROOTS = 50
-NUM_LEVELS = 2
-FANOUT = 2
-DEPTH_RATIO = 1.0
-
-NUM_TRANSACTIONS = 1000
-AVG_TRANSACTION_SIZE = 2
-AVG_ITEMSET_SIZE = 2
-NUM_MAX_ITEMSETS = 8
-CORRELATION_LEVEL = 0.5
-
-np.random.seed(42)
-random.seed(42)
-
-
-# TAXONOMY GENERATION (Forest of Trees)
 class TaxonomyNode:
     def __init__(self, item_id, level):
         self.item_id = item_id
@@ -45,11 +18,33 @@ class TaxonomyNode:
 
 
 class SynteticGenerator:
-    def __init__(self) -> None:
-        pass
+    def __init__(
+        self,
+        num_items=1000,
+        num_roots=25,
+        num_levels=4,
+        fanout=5,
+        depth_ratio=1.0,
+        num_transactions=10000,
+        avg_transaction_size=7,
+        avg_itemset_size=3,
+        num_max_itemsets=100,
+        correlation_level=0.5,
+    ) -> None:
+        self.num_items = num_items
+        self.num_roots = num_roots
+        self.num_levels = num_levels
+        self.fanout = fanout
+        self.depth_ratio = depth_ratio
+
+        self.num_transactions = num_transactions
+        self.avg_transaction_size = avg_transaction_size
+        self.avg_itemset_size = avg_itemset_size
+        self.num_max_itemsets = num_max_itemsets
+        self.correlation_level = correlation_level
 
     def _save_transactions_to_csv(self, transactions: List[Set[int]], path: str):
-        with open(path+".csv", "w", newline="") as f:
+        with open(path + ".csv", "w", newline="") as f:
             writer = csv.writer(f)
             for t in transactions:
                 writer.writerow(list(t))
@@ -57,36 +52,47 @@ class SynteticGenerator:
     def _save_taxonomy_to_json(self, taxonomy_forest, out_path: str):
         taxonomy_dict = self.taxonomy_to_nested_dict(taxonomy_forest)
 
-        with open(out_path+".json", "w") as f:
+        with open(out_path + ".json", "w") as f:
             json.dump(taxonomy_dict, f, indent=2)
 
-    def generate_taxonomy(self, num_items, num_roots, num_levels, fanout):
+    def generate_taxonomy(self, N, R, L, F):
         item_counter = 0
         forest = []
-        all_nodes = {}
 
         def create_subtree(level):
             nonlocal item_counter
-            if item_counter >= num_items:
+            if item_counter >= N or level >= L:
                 return None
             node_id = item_counter
             item_counter += 1
             node = TaxonomyNode(node_id, level)
-            all_nodes[node_id] = node
-            if level < num_levels:
-                num_children = np.random.poisson(fanout)
-                for _ in range(num_children):
+            # Poisson-distributed children
+            num_children = np.random.poisson(F)
+            for _ in range(num_children):
+                if item_counter < N:
                     child = create_subtree(level + 1)
                     if child:
                         node.children.append(child)
             return node
 
-        for _ in range(num_roots):
-            root = create_subtree(0)
-            if root:
-                forest.append(root)
+        for _ in range(R):
+            if item_counter < N:
+                root = create_subtree(0)
+                if root:
+                    forest.append(root)
+        return forest
 
-        return forest, all_nodes
+    def build_all_nodes_dict(self, forest):
+        all_nodes = {}
+
+        def traverse(node):
+            all_nodes[node.item_id] = node
+            for child in node.children:
+                traverse(child)
+
+        for root in forest:
+            traverse(root)
+        return all_nodes
 
     # assign weights (bottom-up)
     def assign_weights(self, forest, depth_ratio):
@@ -101,23 +107,29 @@ class SynteticGenerator:
         for root in forest:
             compute_weight(root)
 
-    # taxonomy to nested dict
     def taxonomy_to_nested_dict(self, forest):
         def node_to_dict(node):
             if not node.children:
                 return {}
             return {child.item_id: node_to_dict(child) for child in node.children}
 
-        taxonomy_dict = {}
-        for root in forest:
-            taxonomy_dict[root.item_id] = node_to_dict(root)
-        return taxonomy_dict
+        return {root.item_id: node_to_dict(root) for root in forest}
 
-    # flatten taxonomy nodes to list of leaves for sampling
     def get_leaves(self, nodes_dict):
         return [node for node in nodes_dict.values() if not node.children]
 
-    # prepare weighted coin toss helper
+    def flatten_taxonomy(self, forest):
+        all_nodes = {}
+
+        def dfs(node):
+            all_nodes[node.item_id] = node
+            for c in node.children:
+                dfs(c)
+
+        for root in forest:
+            dfs(root)
+        return all_nodes
+
     def weighted_choice(self, items, weights):
         total = sum(weights)
         rnd = random.uniform(0, total)
@@ -128,7 +140,6 @@ class SynteticGenerator:
             upto += w
         return items[-1]
 
-    # generate weighted probabilities for all items (including non-leaves)
     def build_weight_distribution(self, all_nodes):
         items = list(all_nodes.keys())
         weights = [all_nodes[i].weight for i in items]
@@ -136,7 +147,6 @@ class SynteticGenerator:
         probs = [w / total_weight for w in weights]
         return items, probs
 
-    # specialize an item (internal node) to a leaf by descending weighted random choice
     def specialize_to_leaf(self, node: TaxonomyNode):
         current = node
         while current.children:
@@ -145,7 +155,6 @@ class SynteticGenerator:
             current = self.weighted_choice(children, weights)
         return current.item_id
 
-    # generate z, the set of potentially frequent itemsets
     def generate_Z(
         self, all_nodes, num_max_itemsets, avg_itemset_size, correlation_level
     ):
@@ -196,30 +205,21 @@ class SynteticGenerator:
 
         return Z, weights_Z
 
-    # corruption: drop items from itemset probabilistically by corruption level c
     def corrupt_itemset(self, itemset: Set[int], corruption_level: float) -> Set[int]:
-        items = list(itemset)
-        retained = []
-        for item in items:
-            if random.random() >= corruption_level:
-                retained.append(item)
-            else:
-                pass
-        if not retained and items:
-            retained = [random.choice(items)]
+        retained = [item for item in itemset if random.random() >= corruption_level]
+        if not retained and len(itemset) > 0:
+            retained = [random.choice(list(itemset))]
         return set(retained)
 
-    # generate transactions
     def generate_transactions(
         self, Z, weights_Z, all_nodes, num_transactions, avg_transaction_size
     ):
-        transactions: List[Set[int]] = []
         num_Z = len(Z)
-
         corruption_levels = np.clip(np.random.normal(0.5, 0.1, num_Z), 0.0, 1.0)
 
-        for num_transa in range(num_transactions):
-            print(num_transa)
+        transactions = []
+
+        for t in range(num_transactions):
             transaction = set()
             target_size = max(1, np.random.poisson(avg_transaction_size))
 
@@ -249,26 +249,25 @@ class SynteticGenerator:
                         break
 
             transactions.append(transaction)
-
         return transactions
 
     def run(self, save: bool = False, path: str = "") -> tuple[List[Set], dict]:
         """
         :returns: transactions, taxonomy
         """
-        taxonomy_forest, taxonomy_nodes = self.generate_taxonomy(
-            NUM_ITEMS, NUM_ROOTS, NUM_LEVELS, FANOUT
+        taxonomy_forest = self.generate_taxonomy(
+            self.num_items, self.num_roots, self.num_levels, self.fanout
         )
-        self.assign_weights(taxonomy_forest, DEPTH_RATIO)
+        all_nodes = self.build_all_nodes_dict(taxonomy_forest)
 
-        print("Generate set Z of potentially frequent itemsets")
+        self.assign_weights(taxonomy_forest, self.depth_ratio)
+
         Z, weights_Z = self.generate_Z(
-            taxonomy_nodes, NUM_MAX_ITEMSETS, AVG_ITEMSET_SIZE, CORRELATION_LEVEL
+            all_nodes, self.num_max_itemsets, self.avg_itemset_size, self.correlation_level
         )
 
-        print("Generate transactions")
         transactions = self.generate_transactions(
-            Z, weights_Z, taxonomy_nodes, NUM_TRANSACTIONS, AVG_TRANSACTION_SIZE
+            Z, weights_Z, all_nodes, self.num_transactions, self.avg_transaction_size
         )
         if save:
             self._save_transactions_to_csv(
@@ -279,6 +278,3 @@ class SynteticGenerator:
             )
         return transactions, self.taxonomy_to_nested_dict(taxonomy_forest)
 
-
-gen = SynteticGenerator()
-gen.run(True, "data/syntetic_data_test")

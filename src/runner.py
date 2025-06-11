@@ -1,7 +1,7 @@
 from loaders.loader import DataLoader
 from collections import defaultdict
 from itertools import combinations
-from typing import Optional
+from typing import Optional, List, Set
 
 
 class Runner:
@@ -16,10 +16,10 @@ class Runner:
         self,
         taxonomy,
         miner,
-        data_loader: Optional[DataLoader],
-        transactions,
         min_support: float,
         min_confidence: float,
+        data_loader: Optional[DataLoader] = None,
+        transactions: Optional[List[Set]] = None,
     ):
         self.taxonomy = taxonomy
         self.data_loader = data_loader

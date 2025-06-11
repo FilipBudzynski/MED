@@ -66,30 +66,39 @@ class Cumulate:
         self, prev_frequent_itemsets: List[frozenset], k: int
     ) -> Set[frozenset]:
         candidates = set()
-        prev_frequent_set = set(sorted(prev_frequent_itemsets))
+        prev_frequent_itemsets = sorted(
+            [sorted(list(itemset)) for itemset in prev_frequent_itemsets]
+        )
+        prev_frequent_set = set(
+            frozenset(itemset) for itemset in prev_frequent_itemsets
+        )
 
-        trie_root = build_trie(prev_frequent_itemsets)
-
-        def traverse(node, prefix, depth):
-            if depth == k - 2:
-                children_items = sorted(node.children.keys())
-                for i in range(len(children_items)):
-                    for j in range(i + 1, len(children_items)):
-                        union = frozenset(
-                            prefix + [children_items[i], children_items[j]]
+        for i in range(len(prev_frequent_itemsets)):
+            for j in range(i + 1, len(prev_frequent_itemsets)):
+                # Join step: check if first k-2 items are the same
+                if (
+                    prev_frequent_itemsets[i][: k - 2]
+                    == prev_frequent_itemsets[j][: k - 2]
+                ):
+                    # Candidate is union of two sets
+                    candidate = frozenset(
+                        sorted(
+                            set(prev_frequent_itemsets[i])
+                            | set(prev_frequent_itemsets[j])
                         )
+                    )
+                    if len(candidate) == k:
+                        # Prune step: all (k-1) subsets must be in prev_frequent_set
                         all_subsets_frequent = True
-                        for subset in combinations(union, k - 1):
+                        for subset in combinations(candidate, k - 1):
                             if frozenset(subset) not in prev_frequent_set:
                                 all_subsets_frequent = False
                                 break
                         if all_subsets_frequent:
-                            candidates.add(union)
-            else:
-                for item, child_node in node.children.items():
-                    traverse(child_node, prefix + [item], depth + 1)
-
-        traverse(trie_root, [], 0)
+                            candidates.add(candidate)
+                else:
+                    # Because sorted, no need to continue inner loop if prefix mismatch
+                    break
         return candidates
 
     def _filter_candidates_with_ancestors(
@@ -146,10 +155,8 @@ class Cumulate:
             if k == 2:
                 Ck = self._filter_candidates_with_ancestors(Ck)
 
-            # Optymalizacja: usuwamy przodków z T* którzy nie są obecni w C_k
             self.T_star = self._prune_T_star(Ck)
 
-            # Obliczamy wsparcie (support)
             counts = defaultdict(int)
             for t in self.transactions:
                 extended_t = set()

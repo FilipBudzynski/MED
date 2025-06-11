@@ -1,18 +1,19 @@
 from runner import Runner
 from data import data
-from cumulate import Cumulate, compute_ancestors_from_tree
+from cumulate import Cumulate
 from loaders.loader import BinaryDataLoader
 
 if __name__ == "__main__":
 
     market_data = data["market"]
+    article_data = data["article"]
 
     runner = Runner(
-        market_data["taxonomy"],
-        Cumulate,
-        BinaryDataLoader(market_data["file_path"]),
-        0.64,
-        0.90,
+        taxonomy=market_data["taxonomy"],
+        miner=Cumulate,
+        data_loader=BinaryDataLoader(market_data["file_path"]),
+        min_support=0.64,
+        min_confidence=0.90,
     )
     runner.mine_frequent_itemsets(log=True)
     runner.mine_assosiation_rules(log=True)
